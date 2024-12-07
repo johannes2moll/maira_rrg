@@ -1,6 +1,7 @@
 # MAIRA-RRG
 
 This repository contains scripts and configurations for fine-tuning MAIRA-2 using LoRA.
+All parameters for training can be set in config.yaml
 
 ## Setup
 
