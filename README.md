@@ -1,12 +1,8 @@
 # MAIRA-RRG
 
-This repository contains scripts and configurations for fine-tuning **MAIRA-2** using **LoRA**.
+This repository contains scripts and configurations for fine-tuning MAIRA-2 using LoRA.
 
-## Introduction
-
-**MAIRA-RRG** is designed to streamline the fine-tuning process of the MAIRA-2 model leveraging Low-Rank Adaptation (**LoRA**). This repository includes all necessary scripts and configurations to get you started quickly.
-
-## Setup and Usage
+## Setup
 
 ### Prerequisites
 
@@ -22,8 +18,8 @@ Follow these steps to set up the environment and get the project running:
 
 ```bash
 # Step 1: Clone the Repository
-git clone https://github.com/yourusername/MAIRA-RRG.git
-cd MAIRA-RRG
+git clone https://github.com/yourusername/maira-rrg.git
+cd maira-rrg
 
 # Step 2: Create Conda Environment
 conda create -n maira python=3.10
@@ -34,7 +30,7 @@ pip install -r requirements.txt
 
 # Step 4: Prepare the Data
 # Place required JSON files in the 'data/' directory
-# Ensure paths in 'config.yaml' (e.g., mimic_cxr_dir) are correctly set.
+# Ensure paths in 'config.yaml' (e.g., mimic_cxr_dir) are correctly set (set mimic images path).
 
 # Step 5: Generate Dataset Splits
 python create_dataset.py
@@ -43,4 +39,4 @@ python create_dataset.py
 python preprocess.py
 
 # Step 7: Train the Model
-python train.py
+./train.sh
