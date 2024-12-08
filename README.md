@@ -19,7 +19,7 @@ Follow these steps to set up the environment and get the project running:
 
 ```bash
 # Step 1: Clone the Repository
-git clone https://github.com/yourusername/maira_rrg.git
+git clone https://github.com/alothomas/maira_rrg.git
 cd maira_rrg
 
 # Step 2: Create Conda Environment
