@@ -1,2 +1,5 @@
 /data
 /processed_data
+/wandb
+/preprocessed
+/outputs
