@@ -14,6 +14,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
+from processing_maira2 import Maira2Processor
 from functools import partial
 from torch.nn.utils.rnn import pad_sequence
 from peft import LoraConfig, get_peft_model
@@ -103,10 +104,13 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
             return_tensors="pt",
         )
 
+
         input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
         input_ids_with_assistant = processed_inputs_with_assistant["input_ids"].squeeze(0)
         attention_mask = processed_inputs_with_assistant["attention_mask"].squeeze(0)
         pixel_values = processed_inputs_with_assistant["pixel_values"].squeeze(0)
+
+        #print(f'decoded inputs is a tensor: {processor.tokenizer.decode(input_ids_with_assistant)}')
 
         # Create labels with user input masked (-100)
         labels = input_ids_with_assistant.clone()
@@ -151,7 +155,13 @@ def train_model(config: Dict, train_dataset: Dataset, val_dataset: Dataset):
     if config["training"].get("num_gpus", 1) > num_gpus:
         config["training"]["num_gpus"] = num_gpus
 
+    '''
     processor = AutoProcessor.from_pretrained(
+        config["model"]["name"],
+        trust_remote_code=True,
+    )
+    '''
+    processor = Maira2Processor.from_pretrained(
         config["model"]["name"],
         trust_remote_code=True,
     )
