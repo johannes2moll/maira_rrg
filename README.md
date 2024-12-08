@@ -5,14 +5,6 @@ All parameters for training can be set in config.yaml
 
 ## Setup
 
-### Prerequisites
-
-Before you begin, ensure you have the following installed:
-
-- [Conda](https://docs.conda.io/en/latest/miniconda.html)
-- Python 3.10
-- Git
-
 ### Installation Steps
 
 Follow these steps to set up the environment and get the project running:
