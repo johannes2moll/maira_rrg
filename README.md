@@ -3,6 +3,7 @@
 This repository contains scripts and configurations for fine-tuning MAIRA-2 using LoRA.
 All parameters for training can be set in config.yaml
 
+Train on findings by changing the create_dataset and train 'impression' parts.
 ## Setup
 
 ### Installation Steps
@@ -28,8 +29,5 @@ pip install -r requirements.txt
 # Step 5: Generate Dataset Splits
 python create_dataset.py
 
-# Step 6: Preprocess Data
-python preprocess.py
-
-# Step 7: Train the Model
+# Step 6: Train the Model
 ./train.sh
