@@ -12,6 +12,7 @@ from transformers import (
     Trainer,
     TrainingArguments,
     TrainerCallback,
+    EarlyStoppingCallback,
 )
 from functools import partial
 from torch.nn.utils.rnn import pad_sequence
@@ -20,6 +21,7 @@ import yaml
 import random
 import wandb
 from processing_maira2 import Maira2Processor
+from tqdm import tqdm 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -81,11 +83,11 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "indication": sample.get("history_section", ""),
         "technique": sample.get("technique_section", ""),
         "comparison": sample.get("comparison_section", ""),
-        "impression": sample.get("impression_section", ""), # "findings": sample.get("findings_section", ""),
+        "impression": sample.get("impression_section", ""),  # "findings": sample.get("findings_section", ""),
     }
 
 
-def preprocess_dataset(jsonl_path: str) -> List[Dict[str, Any]]:
+def preprocess_dataset(jsonl_path: str, subset_size: int = None) -> List[Dict[str, Any]]:
     """
     Preprocess the dataset from a JSONL file.
     """
@@ -93,9 +95,13 @@ def preprocess_dataset(jsonl_path: str) -> List[Dict[str, Any]]:
     raw_samples = load_samples_from_jsonl(jsonl_path)
     logger.info(f"Loaded {len(raw_samples)} raw samples.")
 
+    if subset_size:
+        raw_samples = raw_samples[:subset_size]
+        logger.info(f"Subset size set to {subset_size}. Using first {subset_size} samples.")
+
     processed_samples = []
-    for idx, sample in enumerate(raw_samples):
-        logger.info(f"Processing sample {idx + 1}/{len(raw_samples)}")
+    for idx, sample in enumerate(tqdm(raw_samples, desc="Preprocessing samples", unit="sample")):
+        # logger.info(f"Processing sample {idx + 1}/{len(raw_samples)}") 
         processed_samples.append(preprocess_sample(sample))
 
     return processed_samples
@@ -104,15 +110,28 @@ def preprocess_dataset(jsonl_path: str) -> List[Dict[str, Any]]:
 class RadiologyDataset(Dataset):
     """Custom Dataset for Radiology Data."""
 
-    def __init__(self, samples: List[Dict[str, Any]], config: Dict):
-        self.samples = samples
+    def __init__(self, samples: List[Dict[str, Any]], config: Dict, lazy: bool = False):
         self.config = config
+        self.lazy = lazy
+        if self.lazy:
+            self.raw_samples = samples
+            logger.info("Initialized Dataset with lazy preprocessing.")
+        else:
+            self.samples = samples 
+            logger.info("Initialized Dataset with preprocessed data.")
 
     def __len__(self):
-        return len(self.samples)
+        if self.lazy:
+            return len(self.raw_samples)
+        else:
+            return len(self.samples)
 
     def __getitem__(self, idx: int) -> Dict[str, Any]:
-        return self.samples[idx]
+        if self.lazy:
+            sample = self.raw_samples[idx]
+            return preprocess_sample(sample)
+        else:
+            return self.samples[idx]
 
 
 def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torch.Tensor]:
@@ -121,12 +140,6 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
     batch_pixel_values = []
     batch_labels = []
 
-    '''
-    assistant_prompt = "ASSISTANT:"
-    assistant_token_ids = processor.tokenizer.encode(assistant_prompt, add_special_tokens=False)
-    if not assistant_token_ids:
-        raise ValueError("'ASSISTANT:' token not found in tokenizer.")
-    '''
     for sample in batch:
         # Process inputs without assistant text (user input)
         processed_inputs_no_assistant = processor.format_and_preprocess_reporting_input(
@@ -151,7 +164,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
             comparison=sample["comparison"],
             prior_report=None,
             get_grounding=False,
-            assistant_text=sample["impression"], # sample["findings"],
+            assistant_text=sample["impression"],  # sample["findings"],
             return_tensors="pt",
         )
 
@@ -163,7 +176,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
         # Create labels with user input masked (-100)
         labels = input_ids_with_assistant.clone()
         user_input_length = input_ids_no_assistant.size(0)
-        labels[:user_input_length] = -100 
+        labels[:user_input_length] = -100
 
         batch_input_ids.append(input_ids_with_assistant)
         batch_attention_mask.append(attention_mask)
@@ -171,7 +184,9 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
         batch_labels.append(labels)
 
     # Pad sequences to the longest in the batch
-    batch_input_ids = pad_sequence(batch_input_ids, batch_first=True, padding_value=processor.tokenizer.pad_token_id)
+    batch_input_ids = pad_sequence(
+        batch_input_ids, batch_first=True, padding_value=processor.tokenizer.pad_token_id
+    )
     batch_attention_mask = pad_sequence(batch_attention_mask, batch_first=True, padding_value=0)
     batch_labels = pad_sequence(batch_labels, batch_first=True, padding_value=-100)
     batch_pixel_values = torch.stack(batch_pixel_values)
@@ -184,23 +199,37 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
     }
 
 
-def preprocess_data(config: Dict, subset_size: int = None):
+def preprocess_data(config: Dict, subset_size: int = None, lazy_preprocess: bool = False):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    train_dataset_path = cache_dir / "train_dataset_impression.jsonl" # "train_dataset_findings.jsonl"
-    val_dataset_path = cache_dir / "val_dataset_impression.jsonl" # "val_dataset_findings.jsonl"
+    train_dataset_path = cache_dir / "train_dataset_impression.jsonl"  # "train_dataset_findings.jsonl"
+    val_dataset_path = cache_dir / "val_dataset_impression.jsonl"  # "val_dataset_findings.jsonl"
 
-    def load_and_preprocess(path):
-        raw_samples = load_samples_from_jsonl(str(path))
-        if subset_size:
-            raw_samples = raw_samples[:subset_size]
-        processed_samples = [preprocess_sample(sample) for sample in raw_samples]
-        return RadiologyDataset(processed_samples, config)
+    if lazy_preprocess:
+        logger.info("Using lazy preprocessing mode.")
+        def load_raw(path):
+            raw_samples = load_samples_from_jsonl(str(path))
+            if subset_size:
+                raw_samples = raw_samples[:subset_size]
+            return raw_samples
 
-    train_dataset = load_and_preprocess(train_dataset_path)
-    val_dataset = load_and_preprocess(val_dataset_path)
+        train_samples = load_raw(train_dataset_path)
+        val_samples = load_raw(val_dataset_path)
+    else:
+        logger.info("Using eager preprocessing mode with a loading bar.")
+        def load_and_preprocess(path):
+            raw_samples = load_samples_from_jsonl(str(path))
+            if subset_size:
+                raw_samples = raw_samples[:subset_size]
+            processed_samples = preprocess_dataset(str(path), subset_size=subset_size)
+            return processed_samples
+
+        train_samples = load_and_preprocess(train_dataset_path)
+        val_samples = load_and_preprocess(val_dataset_path)
+
+    train_dataset = RadiologyDataset(train_samples, config, lazy=lazy_preprocess)
+    val_dataset = RadiologyDataset(val_samples, config, lazy=lazy_preprocess)
     return train_dataset, val_dataset
-
 
 
 class GradientNormCallback(TrainerCallback):
@@ -223,6 +252,7 @@ class GradientNormCallback(TrainerCallback):
 
         logger.info(f"Total gradient norm: {total_norm}")
 
+
 class LearningRateLoggerCallback(TrainerCallback):
     def on_step_end(self, args, state, control, **kwargs):
         trainer = kwargs.get('trainer')
@@ -230,7 +260,7 @@ class LearningRateLoggerCallback(TrainerCallback):
             return
         current_lr = trainer.lr_scheduler.get_last_lr()[0]
         logger.info(f"Current Learning Rate: {current_lr}")
- 
+
 
 def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: RadiologyDataset):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -250,8 +280,6 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         device_map="auto",
     )
     model.config.use_cache = False
-
-
 
     peft_config = LoraConfig(
         r=config["lora"]["r"],
@@ -288,19 +316,33 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         fp16=config.get("training", {}).get("fp16", False),
         tf32=config.get("training", {}).get("tf32", True),
         eval_steps=config["training"]["logging_steps"],
-        run_name=config["training"]["run_name"],
+        run_name=config["wandb"]["run_name"],
         warmup_ratio=config["training"]["warmup_ratio"],
         lr_scheduler_type=config["training"]["lr_scheduler_type"],
+        dataloader_num_workers=config.get("training", {}).get("dataloader_num_workers", os.cpu_count()),
+        load_best_model_at_end=True,
+        metric_for_best_model="eval_loss",
+        greater_is_better=False,
     )
 
     data_collator = partial(collate_fn, processor=processor, config=config)
+
+    callbacks = [GradientNormCallback(), LearningRateLoggerCallback()]
+
+    early_stopping_config = config["training"].get("early_stopping", {})
+    if early_stopping_config.get("enabled", False):
+        patience = early_stopping_config.get("patience", 3)
+        early_stopping = EarlyStoppingCallback(early_stopping_patience=patience)
+        callbacks.append(early_stopping)
+        logger.info(f"Early stopping enabled: patience={patience}")
+
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
-        callbacks=[GradientNormCallback(), LearningRateLoggerCallback()],
+        callbacks=callbacks,
     )
 
     logger.info("Starting training...")
@@ -320,13 +362,19 @@ def main():
     config = load_config(config_path)
 
     wandb.init(project=config["wandb"]["project_name"], entity=config["wandb"]["entity"])
+    wandb.run.name = config["wandb"]["run_name"]
 
     random.seed(config["training"]["seed"])
     torch.manual_seed(config["training"]["seed"])
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(config["training"]["seed"])
 
-    train_dataset, val_dataset = preprocess_data(config, subset_size=SUBSET_SIZE)
+    lazy_preprocess = config["training"].get("lazy_preprocess", False)
+    train_dataset, val_dataset = preprocess_data(
+        config,
+        subset_size=SUBSET_SIZE,
+        lazy_preprocess=lazy_preprocess
+    )
     train_model(config, train_dataset, val_dataset)
 
 

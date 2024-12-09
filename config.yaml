@@ -16,7 +16,7 @@ training:
   learning_rate: 2e-5
   lr_scheduler_type: "cosine"
   warmup_ratio: 0.03
-  logging_steps: 10
+  logging_steps: 50
   save_steps: 100
   max_length: 512
   seed: 42
@@ -25,9 +25,11 @@ training:
   tf32: true
   gradient_checkpointing: false
   num_gpus: 2
-  run_name: "train_impression"
   evaluation_strategy: "steps"
   lazy_preprocess: true
+  early_stopping:
+    enabled: true
+    patience: 10
 
 
 lora:
@@ -41,3 +43,4 @@ lora:
 wandb:
   project_name: "maira_rrg"
   entity: "alothomas-stanford-university"
+  run_name: "train_impression"
