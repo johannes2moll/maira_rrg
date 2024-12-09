@@ -24,7 +24,7 @@ from processing_maira2 import Maira2Processor
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration for subset size
+
 SUBSET_SIZE = None
 
 
