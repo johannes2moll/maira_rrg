@@ -62,8 +62,9 @@ def create_datasets(config: Dict) -> None:
             "technique_section": sample.get("technique_section", ""),
             "comparison_section": sample.get("comparison_section", ""),
             "original_report": sample.get("original_report", ""),
-            "findings_section": sample.get("findings_section", ""),
+            "impression_section": sample.get("impression_section", "") #"findings_section": sample.get("findings_section", "")
         }
+
 
         if split == "train":
             train_data.append(sample_data)
@@ -78,8 +79,8 @@ def create_datasets(config: Dict) -> None:
     print(f"Validation samples: {len(val_data)}")
 
     # Save datasets as JSONL
-    train_output_path = cache_dir / "train_dataset.jsonl"
-    val_output_path = cache_dir / "val_dataset.jsonl"
+    train_output_path = cache_dir / "train_dataset_impression.jsonl" #train_dataset_findings.jsonl
+    val_output_path = cache_dir / "val_dataset_impression.jsonl" #val_dataset_findings.jsonl
 
     with open(train_output_path, "w") as f:
         for sample in train_data:

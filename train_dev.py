@@ -11,6 +11,7 @@ from transformers import (
     AutoModelForCausalLM,
     Trainer,
     TrainingArguments,
+    TrainerCallback,
 )
 from functools import partial
 from torch.nn.utils.rnn import pad_sequence
@@ -18,12 +19,13 @@ from peft import LoraConfig, get_peft_model
 import yaml
 import random
 import wandb
+from processing_maira2 import Maira2Processor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Configuration for subset size
-SUBSET_SIZE = 50
+SUBSET_SIZE = None
 
 
 def load_config(config_path: str) -> Dict:
@@ -79,7 +81,7 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "indication": sample.get("history_section", ""),
         "technique": sample.get("technique_section", ""),
         "comparison": sample.get("comparison_section", ""),
-        "findings": sample.get("findings_section", ""),
+        "impression": sample.get("impression_section", ""),
     }
 
 
@@ -119,11 +121,12 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
     batch_pixel_values = []
     batch_labels = []
 
+    '''
     assistant_prompt = "ASSISTANT:"
     assistant_token_ids = processor.tokenizer.encode(assistant_prompt, add_special_tokens=False)
     if not assistant_token_ids:
         raise ValueError("'ASSISTANT:' token not found in tokenizer.")
-
+    '''
     for sample in batch:
         # Process inputs without assistant text (user input)
         processed_inputs_no_assistant = processor.format_and_preprocess_reporting_input(
@@ -138,7 +141,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
             return_tensors="pt",
         )
 
-        # Process inputs with assistant text (including findings)
+        # Process inputs with assistant text (including impression)
         processed_inputs_with_assistant = processor.format_and_preprocess_reporting_input(
             current_frontal=sample["frontal_image"],
             current_lateral=None,
@@ -148,12 +151,10 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
             comparison=sample["comparison"],
             prior_report=None,
             get_grounding=False,
-            assistant_text=sample["findings"],
+            assistant_text=sample["impression"],
             return_tensors="pt",
         )
 
-
-        # Extract necessary fields
         input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
         input_ids_with_assistant = processed_inputs_with_assistant["input_ids"].squeeze(0)
         attention_mask = processed_inputs_with_assistant["attention_mask"].squeeze(0)
@@ -186,8 +187,8 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
 def preprocess_data(config: Dict, subset_size: int = None):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    train_dataset_path = cache_dir / "train_dataset.jsonl"
-    val_dataset_path = cache_dir / "val_dataset.jsonl"
+    train_dataset_path = cache_dir / "train_dataset_impression.jsonl"
+    val_dataset_path = cache_dir / "val_dataset_impression.jsonl"
 
     def load_and_preprocess(path):
         raw_samples = load_samples_from_jsonl(str(path))
@@ -201,6 +202,36 @@ def preprocess_data(config: Dict, subset_size: int = None):
     return train_dataset, val_dataset
 
 
+
+class GradientNormCallback(TrainerCallback):
+    """
+    A custom callback to compute and log gradient norms after each training step.
+    """
+    def on_step_end(self, args, state, control, **kwargs):
+        trainer = kwargs.get('trainer')
+        if trainer is None:
+            return
+
+        gradient_norms = []
+
+        for name, param in trainer.model.named_parameters():
+            if param.grad is not None:
+                param_norm = param.grad.data.norm(2).item()
+                gradient_norms.append((name, param_norm))
+
+        total_norm = torch.nn.utils.clip_grad_norm_(trainer.model.parameters(), max_norm=float('inf')).item()
+
+        logger.info(f"Total gradient norm: {total_norm}")
+
+class LearningRateLoggerCallback(TrainerCallback):
+    def on_step_end(self, args, state, control, **kwargs):
+        trainer = kwargs.get('trainer')
+        if trainer is None:
+            return
+        current_lr = trainer.lr_scheduler.get_last_lr()[0]
+        logger.info(f"Current Learning Rate: {current_lr}")
+ 
+
 def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: RadiologyDataset):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     num_gpus = torch.cuda.device_count()
@@ -208,7 +239,7 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
     if config["training"].get("num_gpus", 1) > num_gpus:
         config["training"]["num_gpus"] = num_gpus
 
-    processor = AutoProcessor.from_pretrained(
+    processor = Maira2Processor.from_pretrained(
         config["model"]["name"],
         trust_remote_code=True,
     )
@@ -220,10 +251,7 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
     )
     model.config.use_cache = False
 
-    if config.get("training", {}).get("gradient_checkpointing", False):
-        model.gradient_checkpointing_enable()
 
-    model.train()
 
     peft_config = LoraConfig(
         r=config["lora"]["r"],
@@ -233,7 +261,11 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         bias="none",
         task_type="CAUSAL_LM",
     )
+    if config.get("training", {}).get("gradient_checkpointing", False):
+        model.gradient_checkpointing_enable(dict(use_reentrant=False))
     model = get_peft_model(model, peft_config)
+
+    model.train()
 
     training_args = TrainingArguments(
         output_dir=config["model"]["output_dir"],
@@ -254,19 +286,21 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         push_to_hub=False,
         dataloader_pin_memory=True,
         fp16=config.get("training", {}).get("fp16", False),
+        tf32=config.get("training", {}).get("tf32", True),
         eval_steps=config["training"]["logging_steps"],
         run_name=config["training"]["run_name"],
-        warmup_ratio=config["training"]["warmup_ratio"]
+        warmup_ratio=config["training"]["warmup_ratio"],
+        lr_scheduler_type=config["training"]["lr_scheduler_type"],
     )
 
     data_collator = partial(collate_fn, processor=processor, config=config)
-
     trainer = Trainer(
         model=model,
         args=training_args,
         train_dataset=train_dataset,
         eval_dataset=val_dataset,
         data_collator=data_collator,
+        callbacks=[GradientNormCallback(), LearningRateLoggerCallback()],
     )
 
     logger.info("Starting training...")

@@ -256,11 +256,12 @@ class Maira2Processor(LlavaProcessor):
         >>> #     {"index": None, "text": " and the prior frontal image", "type": "text"},
         >>> #     {"index": 2, "text": None, "type": "image"},
         >>> #     {"index": None, "text": " PRIOR_REPORT: prior reporting text goes here", "type": "text"},
-        >>> #     {"index": None, "text": " Provide a structured description of the findings in the radiology study in comparison to the "
+        >>> #     {"index": None, "text": " Provide a structured description of the impressions in the radiology study in comparison to the "
         >>> #     "prior frontal image. INDICATION: indication text from report goes here TECHNIQUE: technique text from report "
         >>> #     "goes here COMPARISON: comparison text from report goes here", "type": "text"},
         >>> # ]
         ```
+        For Findings generation: Provide a structured description of the findings in ...
         """
         indication = self._get_section_text_or_missing_text(indication)
         technique = self._get_section_text_or_missing_text(technique)
@@ -276,7 +277,7 @@ class Maira2Processor(LlavaProcessor):
             prompt.append(
                 {
                     "index": None,
-                    "text": " Provide a structured description of the findings in the radiology study in comparison to the "
+                    "text": " Provide a structured description of the impressions in the radiology study in comparison to the "
                     "prior frontal image. Each finding should be described as a self-contained plain-text sentence."
                     " If the finding is groundable, locate the finding in the current frontal chest X-ray image, "
                     "with bounding boxes indicating all locations where it can be seen in the current frontal "
@@ -289,7 +290,7 @@ class Maira2Processor(LlavaProcessor):
             prompt.append(
                 {
                     "index": None,
-                    "text": " Provide a structured description of the findings in the radiology study in comparison to the "
+                    "text": " Provide a structured description of the impressions in the radiology study in comparison to the "
                     f"prior frontal image. INDICATION: {indication} TECHNIQUE: {technique} COMPARISON: "
                     f"{comparison}",
                     "type": "text",
