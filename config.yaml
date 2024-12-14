@@ -18,7 +18,7 @@ training:
   warmup_ratio: 0.03
   logging_steps: 50
   save_steps: 100
-  max_length: 1024
+  max_length: 512
   seed: 42
   gradient_accumulation_steps: 8
   fp16: false
@@ -34,7 +34,7 @@ training:
 inference:
   peft_name: "StanfordAIMI/maira2-srrg-findings"
   batch_size: 2
-  max_length: 1024
+  max_length: 512
   max_new_tokens: 512
   num_beams: 1
   early_stopping: true
