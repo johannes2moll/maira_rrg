@@ -205,7 +205,7 @@ def preprocess_data(config: Dict, subset_size: int = None, lazy_preprocess: bool
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
     train_dataset_path = cache_dir / "train_dataset_findings.jsonl"  # "train_dataset_findings.jsonl"
-    val_dataset_path = cache_dir / "val_dataset_findingsjsonl"  # "val_dataset_findings.jsonl"
+    val_dataset_path = cache_dir / "val_dataset_findings.jsonl"  # "val_dataset_findings.jsonl"
 
     if lazy_preprocess:
         logger.info("Using lazy preprocessing mode.")
@@ -358,6 +358,8 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
     trainer.save_model(config["model"]["output_dir"])
     processor.save_pretrained(config["model"]["output_dir"])
 
+    # push to hub
+    model.push_to_hub("StanfordAIMI/maira2-srrg-findings2", private=True)
 
 def main():
     config_path = "config.yaml"
