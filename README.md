@@ -31,3 +31,9 @@ python create_dataset.py
 
 # Step 6: Train the Model
 ./train.sh
+
+# Step 7: Generate Prediction on Test Set
+python run_model.py
+
+# Step 8: Evaluate
+python eval_model.py
