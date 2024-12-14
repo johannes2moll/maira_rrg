@@ -175,7 +175,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
         # Create labels with user input masked (-100)
         labels = input_ids_with_assistant.clone()
         user_input_length = input_ids_no_assistant.size(0)
-        labels[:user_input_length] = -100
+        labels[:user_input_length-1] = -100
 
         if dataset == "train":
             batch_input_ids.append(input_ids_with_assistant)
@@ -192,7 +192,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
     batch_attention_mask = pad_sequence(batch_attention_mask, batch_first=True, padding_value=0)
     batch_labels = pad_sequence(batch_labels, batch_first=True, padding_value=-100)
     batch_pixel_values = torch.stack(batch_pixel_values)
-
+    
     return {
         "input_ids": batch_input_ids,
         "attention_mask": batch_attention_mask,
