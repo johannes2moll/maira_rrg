@@ -14,7 +14,7 @@ import pandas as pd
 
 from processing_maira2 import Maira2Processor
 from train import RadiologyDataset, load_samples_from_jsonl, collate_fn
-
+NUM_SAMPLES = 10
 SUBSET_SIZE = None
 task = "findings"
 
@@ -27,7 +27,7 @@ def load_config(config_path: str) -> Dict:
 def preprocess_data(config: Dict, subset_size: int = None):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    test_dataset_path = cache_dir / "test_dataset_"+task+".jsonl"  # "test_dataset_findings.jsonl"
+    test_dataset_path = cache_dir / "test_dataset_findings.jsonl"  # "test_dataset_findings.jsonl"
     print("Use lazy preprocessing...")
     def load_raw(path):
         raw_samples = load_samples_from_jsonl(str(path))
@@ -41,9 +41,11 @@ def preprocess_data(config: Dict, subset_size: int = None):
 
 def run_inference(config: Dict, test_dataset: RadiologyDataset):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # set padding_side to left
     processor = Maira2Processor.from_pretrained(
         config["model"]["name"],
         trust_remote_code=True,
+        padding_side="left",
     )
     model = AutoModelForCausalLM.from_pretrained(
         config["model"]["name"],
@@ -71,15 +73,17 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
     # generate structured reports
     # add a progress bar
     progress_bar = tqdm(test_loader, desc="Generating predictions", unit="batch")
-
+    num_batches = 0
     for batch in progress_bar:
+        num_batches += 1
         batch = {k: v.to(device) for k, v in batch.items()}
 
         with torch.no_grad():
             outputs = model.generate(
                 input_ids=batch["input_ids"],
                 attention_mask=batch["attention_mask"],
-                do_sample=False,
+                do_sample=True,
+                num_beams=config["inference"]["num_beams"],
                 max_new_tokens=config["inference"]["max_new_tokens"],
             )
 
@@ -98,6 +102,8 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
         ref_labels[ref_labels == -100] = 0
         list_struct_ref.extend(processor.batch_decode(ref_labels, skip_special_tokens=True))
         
+        if (num_batches*config["inference"]["batch_size"]) >= NUM_SAMPLES:
+            break
 
     return list_original,list_struct_gen, list_struct_ref
 
@@ -109,12 +115,12 @@ def main():
         config,
         subset_size=SUBSET_SIZE)
     list_inp, list_gen, list_refs = run_inference(config, test_dataset)
-    print("input:",list_inp[1])
-    print("output:",list_gen[1])
-    print("reference:",list_refs[1])
+    print("input:",list_inp[0])
+    print("output:",list_gen[0])
+    print("reference:",list_refs[0])
     # save as csv
     pd.DataFrame({"input": list_inp, "generated": list_gen, "reference": list_refs}).to_csv("generated_reports.csv", index=False)
-
+    print("Saved generated reports to generated_reports.csv")
 
 
 if __name__ == "__main__":

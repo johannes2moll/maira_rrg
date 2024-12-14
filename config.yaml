@@ -12,19 +12,19 @@ model:
 
 training:
   batch_size: 4
+  gradient_accumulation_steps: 16
   num_epochs: 5
-  learning_rate: 1e-3
+  learning_rate: 5e-4
   lr_scheduler_type: "cosine"
   warmup_ratio: 0.03
   logging_steps: 10
   save_strategy: "steps"
   save_steps: 200
   seed: 42
-  gradient_accumulation_steps: 8
-  fp16: false
-  tf32: false
-  bf16: true
-  gradient_checkpointing: true
+  fp16: true
+  tf32: true
+  bf16: false
+  gradient_checkpointing: false
   num_gpus: 1
   evaluation_strategy: "steps"
   eval_steps: 200
@@ -34,10 +34,10 @@ training:
     patience: 3
 
 inference:
-  peft_name: "StanfordAIMI/maira2-srrg-findings"
+  peft_name: "StanfordAIMI/maira2-srrg-findings2"
   batch_size: 2
   max_new_tokens: 512
-  num_beams: 1
+  num_beams: 5
   early_stopping: true
 
 
