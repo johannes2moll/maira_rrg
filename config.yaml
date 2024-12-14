@@ -1,9 +1,9 @@
 data:
-  data_dataset: "/home/alois/ReXrank/maira_rrg/data"
-  data_dir: "/home/alois/ReXrank/maira_rrg"
+  data_dataset: "/home/jomoll/dev/maira_rrg/data"
+  data_dir: "/home/jomoll/dev/maira_rrg"
   splits_file: "collated_studies_splits.json"
-  data_file: "collated_studies_impression.json"
-  mimic_cxr_dir: "/home/alois/ReXrank/RaDialog_LLaVA/data/mimic-cxr"
+  data_file: "collated_studies_closed_headings_findings5.json"
+  mimic_cxr_dir: "/home/jomoll/dev/RaDialog_LLaVA/data/mimic-cxr"
   cache_dir: "processed_data"
 
 model:
@@ -18,7 +18,7 @@ training:
   warmup_ratio: 0.03
   logging_steps: 50
   save_steps: 100
-  max_length: 512
+  max_length: 1024
   seed: 42
   gradient_accumulation_steps: 8
   fp16: false
@@ -31,6 +31,14 @@ training:
     enabled: true
     patience: 10
 
+inference:
+  peft_name: "StanfordAIMI/maira2-srrg-findings"
+  batch_size: 2
+  max_length: 1024
+  max_new_tokens: 512
+  num_beams: 1
+  early_stopping: true
+
 
 lora:
   r: 128
@@ -41,6 +49,6 @@ lora:
     - "v_proj"
 
 wandb:
-  project_name: "maira_rrg"
-  entity: "alothomas-stanford-university"
-  run_name: "train_impression"
+  project_name: "maira"
+  entity: "jomoll-stanford"
+  run_name: "train_findings"

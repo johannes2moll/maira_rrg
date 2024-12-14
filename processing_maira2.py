@@ -277,7 +277,7 @@ class Maira2Processor(LlavaProcessor):
             prompt.append(
                 {
                     "index": None,
-                    "text": " Provide a structured description of the impressions in the radiology study in comparison to the "
+                    "text": " Provide a structured description of the findings in the radiology study in comparison to the "
                     "prior frontal image. Each finding should be described as a self-contained plain-text sentence."
                     " If the finding is groundable, locate the finding in the current frontal chest X-ray image, "
                     "with bounding boxes indicating all locations where it can be seen in the current frontal "
@@ -290,7 +290,7 @@ class Maira2Processor(LlavaProcessor):
             prompt.append(
                 {
                     "index": None,
-                    "text": " Provide a structured description of the impressions in the radiology study in comparison to the "
+                    "text": " Provide a structured description of the findings in the radiology study in comparison to the "
                     f"prior frontal image. INDICATION: {indication} TECHNIQUE: {technique} COMPARISON: "
                     f"{comparison}",
                     "type": "text",

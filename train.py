@@ -71,7 +71,6 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
     Preprocess a single sample from the JSONL data.
     """
     # logger.info(f"Preprocessing sample with ID: {sample.get('study_id', 'Unknown ID')}")
-
     frontal_image = load_image(sample["frontal_image"])
     lateral_image = (
         load_image(sample["lateral_image"]) if sample["lateral_image"] else None
@@ -83,7 +82,7 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "indication": sample.get("history_section", ""),
         "technique": sample.get("technique_section", ""),
         "comparison": sample.get("comparison_section", ""),
-        "impression": sample.get("impression_section", ""),  # "findings": sample.get("findings_section", ""),
+        "findings": sample.get("findings_section", ""),  # "findings": sample.get("findings_section", ""),
     }
 
 
@@ -134,7 +133,7 @@ class RadiologyDataset(Dataset):
             return self.samples[idx]
 
 
-def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torch.Tensor]:
+def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[str, torch.Tensor]:
     batch_input_ids = []
     batch_attention_mask = []
     batch_pixel_values = []
@@ -164,7 +163,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
             comparison=sample["comparison"],
             prior_report=None,
             get_grounding=False,
-            assistant_text=sample["impression"],  # sample["findings"],
+            assistant_text=sample["findings"],  # sample["findings"],
             return_tensors="pt",
         )
 
@@ -178,7 +177,10 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
         user_input_length = input_ids_no_assistant.size(0)
         labels[:user_input_length] = -100
 
-        batch_input_ids.append(input_ids_with_assistant)
+        if dataset == "train":
+            batch_input_ids.append(input_ids_with_assistant)
+        else:
+            batch_input_ids.append(input_ids_no_assistant)
         batch_attention_mask.append(attention_mask)
         batch_pixel_values.append(pixel_values)
         batch_labels.append(labels)
@@ -202,8 +204,8 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config) -> Dict[str, torc
 def preprocess_data(config: Dict, subset_size: int = None, lazy_preprocess: bool = False):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    train_dataset_path = cache_dir / "train_dataset_impression.jsonl"  # "train_dataset_findings.jsonl"
-    val_dataset_path = cache_dir / "val_dataset_impression.jsonl"  # "val_dataset_findings.jsonl"
+    train_dataset_path = cache_dir / "train_dataset_findings.jsonl"  # "train_dataset_findings.jsonl"
+    val_dataset_path = cache_dir / "val_dataset_findingsjsonl"  # "val_dataset_findings.jsonl"
 
     if lazy_preprocess:
         logger.info("Using lazy preprocessing mode.")
@@ -325,7 +327,7 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         greater_is_better=False,
     )
 
-    data_collator = partial(collate_fn, processor=processor, config=config)
+    data_collator = partial(collate_fn, processor=processor, config=config, dataset="train")
 
     callbacks = [GradientNormCallback(), LearningRateLoggerCallback()]
 

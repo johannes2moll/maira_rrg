@@ -27,6 +27,7 @@ def create_datasets(config: Dict) -> None:
 
     train_data = []
     val_data = []
+    test_data = []
     missing_images = 0
     total_samples = 0
 
@@ -62,7 +63,7 @@ def create_datasets(config: Dict) -> None:
             "technique_section": sample.get("technique_section", ""),
             "comparison_section": sample.get("comparison_section", ""),
             "original_report": sample.get("original_report", ""),
-            "impression_section": sample.get("impression_section", "") #"findings_section": sample.get("findings_section", "")
+            "findings_section": sample.get("findings_section", "") #"findings_section": sample.get("findings_section", "")
         }
 
 
@@ -70,6 +71,8 @@ def create_datasets(config: Dict) -> None:
             train_data.append(sample_data)
         elif split == "validate":
             val_data.append(sample_data)
+        elif split == "test":
+            test_data.append(sample_data)
 
         total_samples += 1
 
@@ -77,10 +80,12 @@ def create_datasets(config: Dict) -> None:
     print(f"Missing or invalid samples: {missing_images}")
     print(f"Training samples: {len(train_data)}")
     print(f"Validation samples: {len(val_data)}")
+    print(f"Test samples: {len(test_data)}")
 
     # Save datasets as JSONL
-    train_output_path = cache_dir / "train_dataset_impression.jsonl" #train_dataset_findings.jsonl
-    val_output_path = cache_dir / "val_dataset_impression.jsonl" #val_dataset_findings.jsonl
+    train_output_path = cache_dir / "train_dataset_findings.jsonl" #train_dataset_findings.jsonl
+    val_output_path = cache_dir / "val_dataset_findings.jsonl" #val_dataset_findings.jsonl
+    test_output_path = cache_dir / "test_dataset_findings.jsonl" #test_dataset_findings.jsonl
 
     with open(train_output_path, "w") as f:
         for sample in train_data:
@@ -92,6 +97,11 @@ def create_datasets(config: Dict) -> None:
             json_line = json.dumps(sample)
             f.write(json_line + "\n")
 
+    with open(test_output_path, "w") as f:
+        for sample in test_data:
+            json_line = json.dumps(sample)
+            f.write(json_line + "\n")
+            
     print(f"Datasets saved as JSONL to {cache_dir}")
 
 if __name__ == "__main__":
