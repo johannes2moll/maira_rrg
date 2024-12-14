@@ -11,30 +11,31 @@ model:
   output_dir: "outputs"
 
 training:
-  batch_size: 2
-  num_epochs: 3
+  batch_size: 4
+  num_epochs: 5
   learning_rate: 1e-3
   lr_scheduler_type: "cosine"
   warmup_ratio: 0.03
-  logging_steps: 50
-  save_steps: 100
-  max_length: 512
+  logging_steps: 10
+  save_strategy: "steps"
+  save_steps: 200
   seed: 42
   gradient_accumulation_steps: 8
   fp16: false
-  tf32: true
-  gradient_checkpointing: false
-  num_gpus: 2
+  tf32: false
+  bf16: true
+  gradient_checkpointing: true
+  num_gpus: 1
   evaluation_strategy: "steps"
+  eval_steps: 200
   lazy_preprocess: true
   early_stopping:
     enabled: true
-    patience: 10
+    patience: 3
 
 inference:
   peft_name: "StanfordAIMI/maira2-srrg-findings"
   batch_size: 2
-  max_length: 512
   max_new_tokens: 512
   num_beams: 1
   early_stopping: true
@@ -49,6 +50,6 @@ lora:
     - "v_proj"
 
 wandb:
-  project_name: "maira"
+  project_name: "maira_rrg"
   entity: "jomoll-stanford"
   run_name: "train_findings"
