@@ -34,7 +34,7 @@ training:
     patience: 3
 
 inference:
-  peft_name: "StanfordAIMI/maira2-srrg-impression"
+  peft_name: "StanfordAIMI/maira-2-srrg-impression"
   batch_size: 2
   max_new_tokens: 512
   num_beams: 5
