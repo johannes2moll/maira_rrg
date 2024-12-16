@@ -82,7 +82,7 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
         "indication": sample.get("history_section", ""),
         "technique": sample.get("technique_section", ""),
         "comparison": sample.get("comparison_section", ""),
-        "findings": sample.get("findings_section", ""),  # "findings": sample.get("findings_section", ""),
+        "impression": sample.get("impression_section", ""),  # "findings": sample.get("findings_section", ""),
     }
 
 
@@ -163,7 +163,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
             comparison=sample["comparison"],
             prior_report=None,
             get_grounding=False,
-            assistant_text=sample["findings"],  # sample["findings"],
+            assistant_text=sample["impression"],  # sample["findings"],
             return_tensors="pt",
         )
 
@@ -204,8 +204,8 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
 def preprocess_data(config: Dict, subset_size: int = None, lazy_preprocess: bool = False):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    train_dataset_path = cache_dir / "train_dataset_findings.jsonl"  # "train_dataset_findings.jsonl"
-    val_dataset_path = cache_dir / "val_dataset_findings.jsonl"  # "val_dataset_findings.jsonl"
+    train_dataset_path = cache_dir / "train_dataset_impression.jsonl"  # "train_dataset_findings.jsonl"
+    val_dataset_path = cache_dir / "val_dataset_impression.jsonl"  # "val_dataset_findings.jsonl"
 
     if lazy_preprocess:
         logger.info("Using lazy preprocessing mode.")
@@ -360,7 +360,7 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
     processor.save_pretrained(config["model"]["output_dir"])
 
     # push to hub
-    model.push_to_hub("StanfordAIMI/maira2-srrg-findings2", private=True)
+    model.push_to_hub("StanfordAIMI/maira2-srrg-", private=True)
 
 def main():
     config_path = "config.yaml"

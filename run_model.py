@@ -16,7 +16,6 @@ from processing_maira2 import Maira2Processor
 from train import RadiologyDataset, load_samples_from_jsonl, collate_fn
 NUM_SAMPLES = 10
 SUBSET_SIZE = None
-task = "findings"
 
 def load_config(config_path: str) -> Dict:
     """Load YAML configuration file."""
@@ -27,7 +26,7 @@ def load_config(config_path: str) -> Dict:
 def preprocess_data(config: Dict, subset_size: int = None):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    test_dataset_path = cache_dir / "test_dataset_findings.jsonl"  # "test_dataset_findings.jsonl"
+    test_dataset_path = cache_dir / "test_dataset_impression.jsonl"  # "test_dataset_findings.jsonl"
     print("Use lazy preprocessing...")
     def load_raw(path):
         raw_samples = load_samples_from_jsonl(str(path))
@@ -44,9 +43,8 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
     # set padding_side to left
     processor = Maira2Processor.from_pretrained(
         config["model"]["name"],
-        trust_remote_code=True,
-        padding_side="left",
-    )
+        trust_remote_code=True,    )
+    processor.tokenizer.padding_side = "left"
     model = AutoModelForCausalLM.from_pretrained(
         config["model"]["name"],
         trust_remote_code=True,

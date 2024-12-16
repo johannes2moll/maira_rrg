@@ -63,7 +63,7 @@ def create_datasets(config: Dict) -> None:
             "technique_section": sample.get("technique_section", ""),
             "comparison_section": sample.get("comparison_section", ""),
             "original_report": sample.get("original_report", ""),
-            "findings_section": sample.get("findings_section", "") #"findings_section": sample.get("findings_section", "")
+            "impression_section": sample.get("impression_section", "") #"findings_section": sample.get("findings_section", "")
         }
 
 
@@ -83,9 +83,9 @@ def create_datasets(config: Dict) -> None:
     print(f"Test samples: {len(test_data)}")
 
     # Save datasets as JSONL
-    train_output_path = cache_dir / "train_dataset_findings.jsonl" #train_dataset_findings.jsonl
-    val_output_path = cache_dir / "val_dataset_findings.jsonl" #val_dataset_findings.jsonl
-    test_output_path = cache_dir / "test_dataset_findings.jsonl" #test_dataset_findings.jsonl
+    train_output_path = cache_dir / "train_dataset_impression.jsonl" #train_dataset_findings.jsonl
+    val_output_path = cache_dir / "val_dataset_impression.jsonl" #val_dataset_findings.jsonl
+    test_output_path = cache_dir / "test_dataset_impression.jsonl" #test_dataset_findings.jsonl
 
     with open(train_output_path, "w") as f:
         for sample in train_data:
