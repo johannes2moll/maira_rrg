@@ -14,7 +14,7 @@ import pandas as pd
 
 from processing_maira2 import Maira2Processor
 from train import RadiologyDataset, load_samples_from_jsonl, collate_fn
-NUM_SAMPLES = 1
+NUM_SAMPLES = 100
 SUBSET_SIZE = None
 
 def load_config(config_path: str) -> Dict:
@@ -59,7 +59,7 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
         collate_fn=partial(collate_fn, processor=processor, config=config, dataset="test"),
     )
     list_original, list_struct_ref, list_struct_gen = [], [], []
-
+    
     # generate structured reports
     # add a progress bar
     progress_bar = tqdm(test_loader, desc="Generating predictions", unit="batch")
@@ -70,7 +70,7 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
         
         with torch.no_grad():
             outputs = model.generate(
-                input_ids=batch["input_ids"],
+                **batch,
                 max_new_tokens=config["inference"]["max_new_tokens"],
                 use_cache=True,
             )

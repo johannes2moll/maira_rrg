@@ -168,10 +168,8 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
         )
         input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
         input_ids_with_assistant = processed_inputs_with_assistant["input_ids"].squeeze(0)
-        if dataset == "train":
-            attention_mask = processed_inputs_with_assistant["attention_mask"].squeeze(0)
-        else:
-            attention_mask = processed_inputs_no_assistant["attention_mask"].squeeze(0)
+        attention_mask = processed_inputs_with_assistant["attention_mask"].squeeze(0)
+        attention_mask_no_assistant = processed_inputs_no_assistant["attention_mask"].squeeze(0)
         pixel_values = processed_inputs_with_assistant["pixel_values"].squeeze(0)
 
         # Create labels with user input masked (-100)
@@ -181,9 +179,11 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
 
         if dataset == "train":
             batch_input_ids.append(input_ids_with_assistant)
+            batch_attention_mask.append(attention_mask)
         else:
             batch_input_ids.append(input_ids_no_assistant)
-        batch_attention_mask.append(attention_mask)
+            batch_attention_mask.append(attention_mask_no_assistant)
+
         batch_pixel_values.append(pixel_values)
         batch_labels.append(labels)
 
