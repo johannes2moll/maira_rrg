@@ -62,7 +62,7 @@ processed_inputs = processor.format_and_preprocess_reporting_input(
     get_grounding=False, 
 )
 
-
+print("Processed inputs:", processor.decode(processed_inputs["input_ids"][0], skip_special_tokens=True))
 processed_inputs = processed_inputs.to(device)
 with torch.no_grad():
     output_decoding = model.generate(

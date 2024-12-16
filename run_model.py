@@ -14,7 +14,7 @@ import pandas as pd
 
 from processing_maira2 import Maira2Processor
 from train import RadiologyDataset, load_samples_from_jsonl, collate_fn
-NUM_SAMPLES = 10
+NUM_SAMPLES = 1
 SUBSET_SIZE = None
 
 def load_config(config_path: str) -> Dict:
@@ -26,7 +26,7 @@ def load_config(config_path: str) -> Dict:
 def preprocess_data(config: Dict, subset_size: int = None):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    test_dataset_path = cache_dir / "test_dataset_impression.jsonl"  # "test_dataset_findings.jsonl"
+    test_dataset_path = cache_dir / "test_dataset_findings.jsonl"  # "test_dataset_findings.jsonl"
     print("Use lazy preprocessing...")
     def load_raw(path):
         raw_samples = load_samples_from_jsonl(str(path))
@@ -39,25 +39,17 @@ def preprocess_data(config: Dict, subset_size: int = None):
     return test_dataset
 
 def run_inference(config: Dict, test_dataset: RadiologyDataset):
+    base_model_name = "microsoft/maira-2"
+    adapter_model_name = "StanfordAIMI/maira2-srrg-findings2"
+
+    model = AutoModelForCausalLM.from_pretrained(base_model_name, trust_remote_code=True)
+    processor = Maira2Processor.from_pretrained(base_model_name, trust_remote_code=True)
+
+    model = PeftModel.from_pretrained(model, adapter_model_name)
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # set padding_side to left
-    processor = Maira2Processor.from_pretrained(
-        config["model"]["name"],
-        trust_remote_code=True,    )
-    processor.tokenizer.padding_side = "left"
-    model = AutoModelForCausalLM.from_pretrained(
-        config["model"]["name"],
-        trust_remote_code=True,
-        device_map="auto",
-    )
-    model.config.use_cache = False
-    # load peft model
-    peft_config = LoraConfig.from_pretrained(config["inference"]["peft_name"])
-    peft_config.base_model_name_or_path = config["model"]["name"]
-    model = AutoModelForCausalLM.from_pretrained(peft_config.base_model_name_or_path, trust_remote_code=True)
-    model = PeftModel.from_pretrained(model, config["inference"]["peft_name"]).to(device)
-    model.eval()
-    torch.cuda.empty_cache()
+    model = model.eval()
+    model = model.to(device)
     
     # process inputs
     test_loader = torch.utils.data.DataLoader(
@@ -75,14 +67,12 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
     for batch in progress_bar:
         num_batches += 1
         batch = {k: v.to(device) for k, v in batch.items()}
-
+        
         with torch.no_grad():
             outputs = model.generate(
                 input_ids=batch["input_ids"],
-                attention_mask=batch["attention_mask"],
-                do_sample=True,
-                num_beams=config["inference"]["num_beams"],
                 max_new_tokens=config["inference"]["max_new_tokens"],
+                use_cache=True,
             )
 
         list_original.extend(
@@ -102,7 +92,7 @@ def run_inference(config: Dict, test_dataset: RadiologyDataset):
         
         if (num_batches*config["inference"]["batch_size"]) >= NUM_SAMPLES:
             break
-
+    
     return list_original,list_struct_gen, list_struct_ref
 
 def main():

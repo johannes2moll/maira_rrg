@@ -2,7 +2,7 @@ data:
   data_dataset: "/home/jomoll/dev/maira_rrg/data"
   data_dir: "/home/jomoll/dev/maira_rrg"
   splits_file: "collated_studies_splits.json"
-  data_file: "collated_studies_impression4.json"
+  data_file: "collated_studies_closed_headings_findings5.json"
   mimic_cxr_dir: "/home/jomoll/dev/RaDialog_LLaVA/data/mimic-cxr"
   cache_dir: "processed_data"
 
@@ -34,9 +34,9 @@ training:
     patience: 3
 
 inference:
-  peft_name: "StanfordAIMI/maira-2-srrg-impression"
+  peft_name: "StanfordAIMI/maira2-srrg-findings2"
   batch_size: 2
-  max_new_tokens: 512
+  max_new_tokens: 300
   num_beams: 5
   early_stopping: true
 

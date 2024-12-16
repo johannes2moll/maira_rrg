@@ -71,6 +71,7 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
     Preprocess a single sample from the JSONL data.
     """
     # logger.info(f"Preprocessing sample with ID: {sample.get('study_id', 'Unknown ID')}")
+
     frontal_image = load_image(sample["frontal_image"])
     lateral_image = (
         load_image(sample["lateral_image"]) if sample["lateral_image"] else None
@@ -166,26 +167,37 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
             assistant_text=sample["findings"],  # sample["findings"],
             return_tensors="pt",
         )
-        input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
-        input_ids_with_assistant = processed_inputs_with_assistant["input_ids"].squeeze(0)
+
+
+
         if dataset == "train":
+            input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
+            input_ids_with_assistant = processed_inputs_with_assistant["input_ids"].squeeze(0)
             attention_mask = processed_inputs_with_assistant["attention_mask"].squeeze(0)
-        else:
-            attention_mask = processed_inputs_no_assistant["attention_mask"].squeeze(0)
-        pixel_values = processed_inputs_with_assistant["pixel_values"].squeeze(0)
+            pixel_values = processed_inputs_with_assistant["pixel_values"].squeeze(0)
 
-        # Create labels with user input masked (-100)
-        labels = input_ids_with_assistant.clone()
-        user_input_length = input_ids_no_assistant.size(0)
-        labels[:user_input_length-1] = -100
+            labels = input_ids_with_assistant.clone()
+            user_input_length = input_ids_no_assistant.size(0)
+            labels[:user_input_length-1] = -100
 
-        if dataset == "train":
             batch_input_ids.append(input_ids_with_assistant)
-        else:
+            batch_attention_mask.append(attention_mask)
+            batch_pixel_values.append(pixel_values)
+            batch_labels.append(labels)
+        elif dataset == "test":
+            input_ids_no_assistant = processed_inputs_no_assistant["input_ids"].squeeze(0)
+            attention_mask = processed_inputs_no_assistant["attention_mask"].squeeze(0)
+            pixel_values = processed_inputs_no_assistant["pixel_values"].squeeze(0)
+
             batch_input_ids.append(input_ids_no_assistant)
-        batch_attention_mask.append(attention_mask)
-        batch_pixel_values.append(pixel_values)
-        batch_labels.append(labels)
+            batch_attention_mask.append(attention_mask)
+            batch_pixel_values.append(pixel_values)
+            labels = torch.full_like(input_ids_no_assistant, processor.tokenizer.pad_token_id)
+            batch_labels.append(labels)
+
+        else:
+            raise ValueError(f"Invalid dataset: {dataset} provided in collate_fn.")
+
 
     # Pad sequences to the longest in the batch
     batch_input_ids = pad_sequence(
@@ -193,6 +205,7 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
     )
     batch_attention_mask = pad_sequence(batch_attention_mask, batch_first=True, padding_value=0)
     batch_labels = pad_sequence(batch_labels, batch_first=True, padding_value=-100)
+        
     batch_pixel_values = torch.stack(batch_pixel_values)
     
     return {
@@ -201,7 +214,6 @@ def collate_fn(batch: List[Dict[str, Any]], processor, config, dataset) -> Dict[
         "labels": batch_labels,
         "pixel_values": batch_pixel_values,
     }
-
 
 def preprocess_data(config: Dict, subset_size: int = None, lazy_preprocess: bool = False):
     data_dir = Path(config["data"]["data_dir"])
@@ -304,12 +316,13 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         overwrite_output_dir=True,
         num_train_epochs=config["training"]["num_epochs"],
         per_device_train_batch_size=config["training"]["batch_size"],
-        per_device_eval_batch_size=config["training"]["batch_size"],
+        per_device_eval_batch_size=config["training"]["batch_size_eval"],
         gradient_accumulation_steps=config.get("training", {}).get("gradient_accumulation_steps", 1),
         learning_rate=float(config["training"]["learning_rate"]),
         logging_steps=config["training"]["logging_steps"],
         evaluation_strategy=config["training"]["evaluation_strategy"],
-        save_strategy=config["training"]["save_strategy"],
+        eval_steps=config["training"]["eval_steps"],
+        save_strategy="steps",
         save_steps=config["training"]["save_steps"],
         save_total_limit=1,
         remove_unused_columns=False,
@@ -318,9 +331,8 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         push_to_hub=False,
         dataloader_pin_memory=True,
         fp16=config.get("training", {}).get("fp16", False),
-        tf32=config.get("training", {}).get("tf32", False),
-        bf16=config.get("training", {}).get("bf16", True),
-        eval_steps=config["training"]["eval_steps"],
+        bf16=config.get("training", {}).get("bf16", False),
+        tf32=config.get("training", {}).get("tf32", True),
         run_name=config["wandb"]["run_name"],
         warmup_ratio=config["training"]["warmup_ratio"],
         lr_scheduler_type=config["training"]["lr_scheduler_type"],
@@ -330,7 +342,7 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
         greater_is_better=False,
     )
 
-    data_collator = partial(collate_fn, processor=processor, config=config, dataset="train")
+    data_collator = partial(collate_fn, processor=processor, config=config)
 
     callbacks = [GradientNormCallback(), LearningRateLoggerCallback()]
 
@@ -360,9 +372,9 @@ def train_model(config: Dict, train_dataset: RadiologyDataset, val_dataset: Radi
 
     trainer.save_model(config["model"]["output_dir"])
     processor.save_pretrained(config["model"]["output_dir"])
-
-    # push to hub
     model.push_to_hub("StanfordAIMI/maira2-srrg-", private=True)
+
+
 
 def main():
     config_path = "config.yaml"
