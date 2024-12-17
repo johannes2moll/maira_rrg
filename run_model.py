@@ -40,7 +40,7 @@ def preprocess_data(config: Dict, subset_size: int = None):
 
 def run_inference(config: Dict, test_dataset: RadiologyDataset):
     base_model_name = "microsoft/maira-2"
-    adapter_model_name = "StanfordAIMI/maira2-srrg-findings2"
+    adapter_model_name = "StanfordAIMI/maira2-srrg-findings3"
 
     model = AutoModelForCausalLM.from_pretrained(base_model_name, trust_remote_code=True)
     processor = Maira2Processor.from_pretrained(base_model_name, trust_remote_code=True)
