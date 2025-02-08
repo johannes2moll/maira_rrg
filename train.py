@@ -22,6 +22,7 @@ import random
 import wandb
 from processing_maira2 import Maira2Processor
 from tqdm import tqdm 
+from datasets import load_dataset
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -36,6 +37,17 @@ def load_config(config_path: str) -> Dict:
         config = yaml.safe_load(f)
     return config
 
+def load_samples_from_huggingface(dataset_name: str, split: str) -> List[Dict[str, Any]]:
+    """
+    Load data from a Hugging Face dataset.
+    """
+    dataset = load_dataset(dataset_name, split=split)
+    samples = []
+    for idx, sample in enumerate(dataset):
+        if 'mimic' in sample["image_paths"][0]:
+            samples.append(sample)
+    logger.info(f"Loaded {len(samples)} samples from Hugging Face dataset: {dataset_name}")
+    return samples
 
 def load_samples_from_jsonl(jsonl_path: str) -> List[Dict[str, Any]]:
     """
@@ -71,10 +83,10 @@ def preprocess_sample(sample: Dict[str, Any]) -> Dict[str, Any]:
     Preprocess a single sample from the JSONL data.
     """
     # logger.info(f"Preprocessing sample with ID: {sample.get('study_id', 'Unknown ID')}")
-    frontal_image = load_image(sample["frontal_image"])
-    lateral_image = (
-        load_image(sample["lateral_image"]) if sample["lateral_image"] else None
-    )
+    #frontal_image = load_image(sample["frontal_image"])
+    image_path = sample["image_paths"][0]#'/home/jomoll/dev/RaDialog_LLaVA/data/mimic-cxr' + sample["image_paths"][0].split('mimic-cxr-images-512')[-1]
+    frontal_image = load_image(image_path)
+    lateral_image = None
 
     return {
         "frontal_image": frontal_image,

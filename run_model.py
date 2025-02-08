@@ -13,7 +13,7 @@ from tqdm import tqdm
 import pandas as pd
 
 from processing_maira2 import Maira2Processor
-from train import RadiologyDataset, load_samples_from_jsonl, collate_fn
+from train import RadiologyDataset, load_samples_from_jsonl, collate_fn, load_samples_from_huggingface
 NUM_SAMPLES = 100
 SUBSET_SIZE = None
 
@@ -26,10 +26,10 @@ def load_config(config_path: str) -> Dict:
 def preprocess_data(config: Dict, subset_size: int = None):
     data_dir = Path(config["data"]["data_dir"])
     cache_dir = data_dir / config["data"]["cache_dir"]
-    test_dataset_path = cache_dir / "test_dataset_findings.jsonl"  # "test_dataset_findings.jsonl"
+    test_dataset_path = "StanfordAIMI/srrg_findings_impression" #cache_dir / "test_dataset_findings.jsonl"  # "test_dataset_findings.jsonl"
     print("Use lazy preprocessing...")
-    def load_raw(path):
-        raw_samples = load_samples_from_jsonl(str(path))
+    def load_raw(test_dataset_path):
+        raw_samples = load_samples_from_huggingface(test_dataset_path, split="test_reviewed")    #load_samples_from_jsonl(str(path))
         if subset_size:
             raw_samples = raw_samples[:subset_size]
         return raw_samples
@@ -40,11 +40,10 @@ def preprocess_data(config: Dict, subset_size: int = None):
 
 def run_inference(config: Dict, test_dataset: RadiologyDataset):
     base_model_name = "microsoft/maira-2"
-    adapter_model_name = "StanfordAIMI/maira2-srrg-findings3"
+    adapter_model_name = "StanfordAIMI/maira2-srrg-findings2"
 
     model = AutoModelForCausalLM.from_pretrained(base_model_name, trust_remote_code=True)
     processor = Maira2Processor.from_pretrained(base_model_name, trust_remote_code=True)
-
     model = PeftModel.from_pretrained(model, adapter_model_name)
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
