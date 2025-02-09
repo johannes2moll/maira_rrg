@@ -14,7 +14,7 @@ import pandas as pd
 
 from processing_maira2 import Maira2Processor
 from train import RadiologyDataset, load_samples_from_jsonl, collate_fn, load_samples_from_huggingface
-NUM_SAMPLES = 100
+NUM_SAMPLES = 1000
 SUBSET_SIZE = None
 
 def load_config(config_path: str) -> Dict:
@@ -40,7 +40,7 @@ def preprocess_data(config: Dict, subset_size: int = None):
 
 def run_inference(config: Dict, test_dataset: RadiologyDataset):
     base_model_name = "microsoft/maira-2"
-    adapter_model_name = "StanfordAIMI/maira2-srrg-findings2"
+    adapter_model_name = "StanfordAIMI/maira-2-srrg-impression"
 
     model = AutoModelForCausalLM.from_pretrained(base_model_name, trust_remote_code=True)
     processor = Maira2Processor.from_pretrained(base_model_name, trust_remote_code=True)
@@ -108,6 +108,12 @@ def main():
     # save as csv
     pd.DataFrame({"input": list_inp, "generated": list_gen, "reference": list_refs}).to_csv("generated_reports.csv", index=False)
     print("Saved generated reports to generated_reports.csv")
+    # save as json
+    import json
+    with open("generated_reports_maira2_mimic_impression.json", "w") as f:
+        json.dump(list_gen, f)
+    with open("reference_reports_maira2_mimic_impression.json", "w") as f:
+        json.dump(list_refs, f)
 
 
 if __name__ == "__main__":
